@@ -31,104 +31,35 @@ ex = Experiment("train", ingredients=[train_ingredient, exp_ingredient])
 logger = create_logger(__name__, level=logging.INFO)
 
 
-def prepare(arg_parser, train, exp):
+def prepare(train, exp):
     """
     create logdirs, check dataset, seed pseudo-random generators
     """
-    # # args and init
-    # args = helper_util.AttrDict(**train, **exp)
-    # args.dout = os.path.join(constants.ET_LOGS, args.name)
-    # args.data["train"] = args.data["train"].split(",")
-    # args.data["valid"] = args.data["valid"].split(",") if args.data["valid"] else []
-    # num_datas = len(args.data["train"]) + len(args.data["valid"])
-    # for key in ("ann_type",):
-    #     args.data[key] = args.data[key].split(",")
-    #     if len(args.data[key]) == 1:
-    #         args.data[key] = args.data[key] * num_datas
-    #     if len(args.data[key]) != num_datas:
-    #         raise ValueError("Provide either 1 {} or {} separated by commas".format(key, num_datas))
-    # # set seeds
-    # torch.manual_seed(args.seed)
-    # random.seed(a=args.seed)
-    # np.random.seed(args.seed)
-    
-    # RL Runner args
-    arg_parser.add_argument(
-        "--data_dir",
-        type=str,
-        default="/tmp/teach-dataset",
-        help='Base data directory containing subfolders "games" and "edh_instances',
-    )
-    arg_parser.add_argument(
-        "--images_dir",
-        type=str,
-        default="/home/ubuntu/simbot/teach/exp/images",
-        help="Images directory for episode replay output",
-    )
-    arg_parser.add_argument(
-        "--use_img_file",
-        dest="use_img_file",
-        action="store_true",
-        help="synchronous save images with model api use the image file instead of streaming image",
-    )
-    arg_parser.add_argument(
-        "--output_dir",
-        type=str,
-        default="/home/ubuntu/simbot/teach/exp",
-        help="Directory to store output files from playing EDH instances",
-    )
-    arg_parser.add_argument(
-        "--split",
-        type=str,
-        default="train",
-        choices=["train", "valid_seen", "valid_unseen", "test_seen", "test_unseen"],
-        help="One of train, valid_seen, valid_unseen, test_seen, test_unseen",
-    )
-    arg_parser.add_argument(
-        "--edh_instance_file",
-        type=str,
-        help="Run only on this EDH instance. Split must be set appropriately to find corresponding game file.",
-    )
-    arg_parser.add_argument("--num_processes", type=int, default=1, help="Number of processes to use")
-    arg_parser.add_argument(
-        "--max_init_tries",
-        type=int,
-        default=5,
-        help="Max attempts to correctly initialize an instance before declaring it as a failure",
-    )
-    arg_parser.add_argument(
-        "--max_traj_steps",
-        type=int,
-        default=1000,
-        help="Max predicted trajectory steps",
-    )
-    arg_parser.add_argument("--max_api_fails", type=int, default=30, help="Max allowed API failures")
-    arg_parser.add_argument(
-        "--metrics_file",
-        type=str,
-        default="/home/ubuntu/simbot/teach/exp/metrics_file",
-        help="File used to store metrics",
-    )
-    arg_parser.add_argument(
-        "--model_module",
-        type=str,
-        default="teach.inference.et_rl_model",
-        help="Path of the python module to load the model class from.",
-    )
-    arg_parser.add_argument(
-        "--model_class", type=str, default="ETRLModel", help="Name of the TeachModel class to use during inference."
-    )
-    arg_parser.add_argument(
-        "--replay_timeout", type=int, default=500, help="The timeout for playing back the interactions in an episode."
-    )
+
+    # Data loading args
+    args = helper_util.AttrDict(**train, **exp)
 
     # make output dir
     # logger.info("Train args: %s" % str(args))
     # if not os.path.isdir(args.dout):
     #     os.makedirs(args.dout)
-    args, model_args = arg_parser.parse_known_args()
 
-    return args, model_args
+    # args and init
+    args.data["train"] = args.data["train"].split(",")
+    args.data["valid"] = args.data["valid"].split(",") if args.data["valid"] else []
+    num_datas = len(args.data["train"]) + len(args.data["valid"])
+    for key in ("ann_type",):
+        args.data[key] = args.data[key].split(",")
+        if len(args.data[key]) == 1:
+            args.data[key] = args.data[key] * num_datas
+        if len(args.data[key]) != num_datas:
+            raise ValueError("Provide either 1 {} or {} separated by commas".format(key, num_datas))
+    # set seeds
+    torch.manual_seed(args.seed)
+    random.seed(a=args.seed)
+    np.random.seed(args.seed)
+
+    return args
 
 
 def load_only_matching_layers(model, pretrained_model, train_lmdb_name):
@@ -157,7 +88,7 @@ def load_only_matching_layers(model, pretrained_model, train_lmdb_name):
     return pretrained_dict
 
 
-def create_model(args, embs_ann, vocab_out):
+def create_model(args, embs_ann=None, vocab_out=None):
     """
     load a model and its optimizer
     """
@@ -270,21 +201,28 @@ def main(train, exp):
     """
     train a network using an lmdb dataset
     """
+    start_time = datetime.now()
+
     mp.set_start_method("spawn", force=True)
     # parse args
-    arg_parser = ArgumentParser()
-    args, model_args = prepare(arg_parser, train, exp)
+    args = prepare(train, exp)
 
-    # # load dataset(s) and process vocabs
-    # datasets = []
-    # ann_types = iter(args.data["ann_type"])
-    # for name, ann_type in zip(args.data["train"], ann_types):
-    #     datasets.extend(load_data(name, args, ann_type))
-    # for name, ann_type in zip(args.data["valid"], ann_types):
-    #     datasets.extend(load_data(name, args, ann_type, valid_only=True))
-    # # assign vocabs to datasets and check their sizes for nn.Embeding inits
-    # embs_ann, vocab_out = process_vocabs(datasets, args)
-    # logger.debug("In train.main, vocab_out = %s" % str(vocab_out))
+    # load dataset(s) and process vocabs
+    datasets = []
+    ann_types = iter(args.data["ann_type"])
+    for name, ann_type in zip(args.data["train"], ann_types):
+        datasets.extend(load_data(name, args, ann_type))
+    for name, ann_type in zip(args.data["valid"], ann_types):
+        datasets.extend(load_data(name, args, ann_type, valid_only=True))
+    # assign vocabs to datasets and check their sizes for nn.Embeding inits
+    embs_ann, vocab_out = process_vocabs(datasets, args)
+    args.embs_ann = embs_ann
+    args.vocab_out = vocab_out
+
+    # Model args for teh simulator
+    model_args = [args.model_module, args.model_class]
+
+    logger.debug("In train.main, vocab_out = %s" % str(vocab_out))
     # # wrap datasets with loaders
     # loaders = wrap_datasets(datasets, args)
     # # create the model
@@ -292,7 +230,6 @@ def main(train, exp):
     # start train loop
     # model.run_train(loaders, prev_train_info, optimizer=optimizer)
 
-    start_time = datetime.now()
 
     if args.edh_instance_file:
         edh_instance_files = [args.edh_instance_file]
@@ -322,7 +259,7 @@ def main(train, exp):
         max_api_fails=args.max_api_fails,
         model_class=dynamically_load_class(args.model_module, args.model_class),
         replay_timeout=args.replay_timeout,
-        model_args=model_args,
+        model_args=args,
         use_img_file=args.use_img_file,
     )
 

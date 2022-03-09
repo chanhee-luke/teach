@@ -138,9 +138,10 @@ class Model(base.Model):
         self.frames_traj = torch.zeros(1, 0, *self.visual_tensor_shape)
         self.action_traj = torch.zeros(1, 0).long()
 
-    def step(self, input_dict, vocab, prev_action=None):
+    def step(self, input_dict, vocab, prev_action=None, is_train=False):
         """
         forward the model for a single time-step (used for real-time execution during eval)
+        for train with modification
         """
         frames = input_dict["frames"]
         device = frames.device
@@ -161,11 +162,14 @@ class Model(base.Model):
             length_frames_max=self.frames_traj.size(1),
             action=action_traj_pad,
         )
-        step_out = {}
-        for key, value in model_out.items():
-            # return only the last actions, ignore the rest
-            step_out[key] = value[:, -1:]
-        return step_out
+        if is_train:
+            return model_out
+        else:
+            step_out = {}
+            for key, value in model_out.items():
+                # return only the last actions, ignore the rest
+                step_out[key] = value[:, -1:]
+            return step_out
 
     def compute_batch_loss(self, model_out, gt_dict):
         """

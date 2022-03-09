@@ -16,6 +16,10 @@ def cfg_exp():
     name = "default"
     # model to use
     model = "transformer"
+    # Path of the python module to load the class (RL-only)
+    model_module = "teach.inference.et_rl_model"
+    # Name of the TeachModel class to use during inference (RL-only)
+    model_class = "ETRLModel"
     # which device to use
     device = "cuda"
     # number of data loading workers or evaluation processes (0 for main thread)
@@ -31,7 +35,7 @@ def cfg_exp():
     # DATA SETTINGS
     data = {
         # dataset name(s) for training and validation
-        "train": None,
+        "train": "lmdb_edh",
         # additional dataset name(s) can be specified for validation only
         "valid": "",
         # specify the length of each dataset
@@ -41,9 +45,52 @@ def cfg_exp():
         # Train dataloader type - sample or shuffle ("sample" results in sampling length points per epoch with
         # replacement and "shuffle" results in iterating through the train dataset in random order per epoch
         "train_load_type": "shuffle",
+
     }
 
+    ## RL Simulator config
+
+    # Default data_dir
+    data_dir = "/tmp/teach-dataset"    
+
+    # Number of processes
+    num_processes = 1
+
+    # Max attempts to correctly initialize an instance before declaring it as a failure
+    max_init_tries = 1
+
+    # Max predicted trajectory steps
+    max_traj_steps = 1000
+
+    # Maximum api fails
+    max_api_fails = 30
+
+    # Default path for metrics
+    metrics_file = "/home/ubuntu/simbot/teach/exp/metrics_file"
+
+    # The timeout for playing back the interactions in an episode.
+    replay_timeout = 500
+
+    # Default image output dir
+    images_dir = "/home/ubuntu/simbot/teach/exp/images"
+
+    # Default output_dir
+    output_dir = "/home/ubuntu/simbot/teach/exp"
+
+    # Single edh instance file
+    edh_instance_file = None
+
+    # Synchronous save images with model api use the image file instead of streaming image
+    use_img_file = False
+
     lang_pretrain_over_history_subgoals = False
+
+    # RL Train object detector args
+    object_predictor = "/home/ubuntu/simbot/teach/exp/pretrained/maskrcnn_model.pth"
+    visual_checkpoint = "/home/ubuntu/simbot/teach/exp/pretrained/fasterrcnn_model.pth"
+    model_dir = "/home/ubuntu/simbot/teach/exp/teach_et_rl_trial"
+    checkpoint = "base.pth"
+    skip_edh_history = False
 
 
 @eval_ingredient.config
@@ -212,3 +259,6 @@ def cfg_train():
     }
 
     use_alfred_weights = False
+
+    # RL configs
+    split = "train"
