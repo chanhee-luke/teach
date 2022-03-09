@@ -1,4 +1,4 @@
-# Episodic Transformer based EDH Baseline Model
+# Episodic Transformer + RL based EDH Baseline Model
 
 This subdirectory is based on the [Episodic Transformer (E.T.) repository](https://github.com/alexpashevich/E.T.) which builds on the [ALFRED repository](https://github.com/askforalfred/alfred). 
 The E.T. model is adapted here for the TEACh EDH benchmark.
@@ -14,10 +14,10 @@ export TEACH_ROOT_DIR=/path/to/teach/repo
 export ET_LOGS=/path/to/store/checkpoints
 export VENV_DIR=/path/to/folder/to/store/venv
 export TEACH_SRC_DIR=$TEACH_ROOT_DIR/src
-export ET_ROOT=$TEACH_SRC_DIR/guides/modeling/ET
+export ET_ROOT=$TEACH_SRC_DIR/teach/modeling/ET
 export INFERENCE_OUTPUT_PATH=/path/to/store/inference/execution/files
 ```
-Create a virtual environment
+Create a virtual environment (follow this or use Conda)
 
 ```buildoutcfg
 python3 -m venv $VENV_DIR/teach_env
@@ -36,7 +36,7 @@ mv pretrained $ET_LOGS/
 rm et_checkpoints.zip
 ```
 
-Perform ET preprocessing (this extracts image features and does some processing of EDH jsons)
+Perform ET preprocessing (this extracts image features and does some processing of EDH jsons) (Skip this)
 ```buildoutcfg
 python -m alfred.data.create_lmdb \
     with args.visual_checkpoint=$ET_LOGS/pretrained/fasterrcnn_model.pth \
@@ -50,7 +50,7 @@ Note: If running on laptop on a small subset of the data, use `args.vocab_path=$
 
 Train a model (adjust the `train.epochs` value in this command to specify the number of desired train epochs)
 ```buildoutcfg
-python -m alfred.model.train with exp.model=transformer \
+python -m alfred.model.train \
     exp.name=teach_et_trial \
     exp.data.train=lmdb_edh \
     train.epochs=20  \
