@@ -330,6 +330,8 @@ def obj_classes_loss(pred_obj_cls, gt_obj_cls, interact_idxs):
     # the interaction objects should be non zeros
     assert not (gt_obj_cls == 0).any()
     # compute the loss for interaction objects
+    print(pred_obj_cls_inter.size())
+    print(gt_obj_cls.size())
     obj_cls_loss = F.cross_entropy(pred_obj_cls_inter, gt_obj_cls, reduction="mean")
     return obj_cls_loss
 

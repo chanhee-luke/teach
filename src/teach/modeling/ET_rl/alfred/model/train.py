@@ -85,6 +85,7 @@ def create_model(args, embs_ann, vocab_out):
         model.args = args
     else:
         # create a new model
+        logger.info("****Creating new model****")
         if not args.resume and os.path.isdir(args.dout):
             shutil.rmtree(args.dout)
         model = LearnedModel(args, embs_ann, vocab_out)

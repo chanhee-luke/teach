@@ -10,6 +10,7 @@ from alfred.config import exp_ingredient, train_ingredient
 from alfred.data import GuidesEdhDataset, GuidesSpeakerDataset
 from alfred.model.learned import LearnedModel
 from alfred.utils import data_util, helper_util, model_util
+from alfred.model.et_rl_model import ETRLModel
 from sacred import Experiment
 
 from teach.logger import create_logger
@@ -25,6 +26,7 @@ from teach.eval.compute_metrics import aggregate_metrics
 from teach.rl_utils.rl_train_runner import RLTrainRunner, RLTrainRunnerConfig
 from teach.logger import create_logger
 from teach.utils import dynamically_load_class
+
 
 ex = Experiment("train", ingredients=[train_ingredient, exp_ingredient])
 
@@ -86,48 +88,6 @@ def load_only_matching_layers(model, pretrained_model, train_lmdb_name):
             logger.debug("Mismatched size: %s %s %s" % (name, str(param.size()), str(model_dict[model_name].size())))
     logger.debug("Matched keys: %s" % str(pretrained_dict.keys()))
     return pretrained_dict
-
-
-def create_model(args, embs_ann=None, vocab_out=None):
-    """
-    load a model and its optimizer
-    """
-    prev_train_info = model_util.load_log(args.dout, stage="train")
-    if args.resume and os.path.exists(os.path.join(args.dout, "latest.pth")):
-        # load a saved model
-        loadpath = os.path.join(args.dout, "latest.pth")
-        model, optimizer = model_util.load_model(loadpath, args.device, prev_train_info["progress"] - 1)
-        assert model.vocab_out.contains_same_content(vocab_out)
-        model.args = args
-    else:
-        # create a new model
-        if not args.resume and os.path.isdir(args.dout):
-            shutil.rmtree(args.dout)
-        model = LearnedModel(args, embs_ann, vocab_out)
-        model = model.to(torch.device(args.device))
-        optimizer = None
-        if args.pretrained_path:
-            if "/" not in args.pretrained_path:
-                # a relative path at the logdir was specified
-                args.pretrained_path = model_util.last_model_path(args.pretrained_path)
-            logger.info("Loading pretrained model from {}".format(args.pretrained_path))
-            pretrained_model = torch.load(args.pretrained_path, map_location=torch.device(args.device))
-            if args.use_alfred_weights:
-                pretrained_dict = load_only_matching_layers(model, pretrained_model, args.data["train"][0])
-                model_dict = model.state_dict()
-                model_dict.update(pretrained_dict)
-                model.load_state_dict(model_dict)
-                loaded_keys = pretrained_dict.keys()
-            else:
-                model.load_state_dict(pretrained_model["model"], strict=False)
-                loaded_keys = set(model.state_dict().keys()).intersection(set(pretrained_model["model"].keys()))
-            assert len(loaded_keys)
-            logger.debug("Loaded keys: %s", str(loaded_keys))
-    # put encoder on several GPUs if asked
-    if torch.cuda.device_count() > 1:
-        logger.info("Parallelizing the model")
-        model.model = helper_util.DataParallel(model.model)
-    return model, optimizer, prev_train_info
 
 
 def load_data(name, args, ann_type, valid_only=False):
@@ -257,14 +217,15 @@ def main(train, exp):
         max_init_tries=args.max_init_tries,
         max_traj_steps=args.max_traj_steps,
         max_api_fails=args.max_api_fails,
-        model_class=dynamically_load_class(args.model_module, args.model_class),
         replay_timeout=args.replay_timeout,
         model_args=args,
         use_img_file=args.use_img_file,
     )
 
+    model = ETRLModel(runner_config.model_args)
+
     runner = RLTrainRunner(edh_instance_files, runner_config)
-    metrics = runner.run()
+    metrics = runner.run(model)
 
     train_end_time = datetime.now()
     logger.info("Time for RL training: %s" % str(train_end_time - start_time))

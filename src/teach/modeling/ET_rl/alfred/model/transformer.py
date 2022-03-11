@@ -206,10 +206,15 @@ class Model(base.Model):
                     .nonzero(as_tuple=False)
                     .view(-1)
                 )
-            if interact_idxs.nelement() > 0:
-                object_pred = object_pred.view(object_pred.shape[0] * object_pred.shape[1], *object_pred.shape[2:])
-                object_loss = model_util.obj_classes_loss(object_pred, object_gt, interact_idxs)
-                losses["object"] = object_loss * self.args.object_loss_wt
+            #print(gt_dict["driver_actions_pred_mask"])
+            #print(gt_dict["obj_interaction_action"])
+            # if interact_idxs.nelement() > 0:
+            #     #print(object_pred.size())
+            #     #print(object_gt.size())
+            #     object_pred = object_pred.view(object_pred.shape[0] * object_pred.shape[1], *object_pred.shape[2:])
+            #     #print(object_pred.size())
+            #     object_loss = model_util.obj_classes_loss(object_pred, object_gt, interact_idxs)
+            #     losses["object"] = object_loss * self.args.object_loss_wt
 
         # subgoal completion loss
         if self.args.subgoal_aux_loss_wt > 0:
