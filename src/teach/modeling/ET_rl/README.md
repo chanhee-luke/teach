@@ -43,7 +43,7 @@ Train a model (adjust the `train.epochs` value in this command to specify the nu
 python -m alfred.model.train_rl
 ```
 
-#BELOW IS NOT SUPPORTED AT THIS MOMENT
+# BELOW IS NOT SUPPORTED AT THIS MOMENT
 
 Note: If running on laptop on a small subset of the data, add `exp.device=cpu` and `exp.num_workers=1`
 
