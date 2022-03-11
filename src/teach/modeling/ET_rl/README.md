@@ -1,21 +1,11 @@
-# Episodic Transformer + RL based EDH Baseline Model
-
-This subdirectory is based on the [Episodic Transformer (E.T.) repository](https://github.com/alexpashevich/E.T.) which builds on the [ALFRED repository](https://github.com/askforalfred/alfred). 
-The E.T. model is adapted here for the TEACh EDH benchmark.
-Note that we have removed files not used when running E.T. on TEACh, and many files have been significantly modified. 
+# Multi-Layer Transformer + RL based EDH Baseline Model
 
 The following instructions to train and evaluate an E.T. model on TEACh assume that you have the TEACh dataset downloaded. 
 If running on a laptop, it might be desirable to mimic the folder structure of the TEACh dataset, but using only a small number of games from each split, and their corresponding images and EDH instances. 
 
 Set some useful environment variables
-```buildoutcfg
-export ET_DATA=/tmp/teach-dataset
-export TEACH_ROOT_DIR=/path/to/teach/repo
-export ET_LOGS=/path/to/store/checkpoints
-export VENV_DIR=/path/to/folder/to/store/venv
-export TEACH_SRC_DIR=$TEACH_ROOT_DIR/src
-export ET_ROOT=$TEACH_SRC_DIR/teach/modeling/ET
-export INFERENCE_OUTPUT_PATH=/path/to/store/inference/execution/files
+```
+source env_setup.source
 ```
 Create a virtual environment (follow this or use Conda)
 
@@ -36,7 +26,7 @@ mv pretrained $ET_LOGS/
 rm et_checkpoints.zip
 ```
 
-Perform ET preprocessing (this extracts image features and does some processing of EDH jsons) (Skip this)
+Perform ET preprocessing (this extracts image features and does some processing of EDH jsons) (Do this, takes 2 hours. You can do it on the other directory ET directory)
 ```buildoutcfg
 python -m alfred.data.create_lmdb \
     with args.visual_checkpoint=$ET_LOGS/pretrained/fasterrcnn_model.pth \
@@ -50,12 +40,11 @@ Note: If running on laptop on a small subset of the data, use `args.vocab_path=$
 
 Train a model (adjust the `train.epochs` value in this command to specify the number of desired train epochs)
 ```buildoutcfg
-python -m alfred.model.train \
-    exp.name=teach_et_trial \
-    exp.data.train=lmdb_edh \
-    train.epochs=20  \
-    train.seed=2
+python -m alfred.model.train_rl
 ```
+
+#BELOW IS NOT SUPPORTED AT THIS MOMENT
+
 Note: If running on laptop on a small subset of the data, add `exp.device=cpu` and `exp.num_workers=1`
 
 Copy certain necessary files to the model folder so that we do not have to access training info at inference time.
