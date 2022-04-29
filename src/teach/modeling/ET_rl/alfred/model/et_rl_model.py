@@ -13,14 +13,15 @@ from alfred import constants
 from alfred.data import GuidesEdhDataset
 from alfred.data.preprocessor import Preprocessor
 from alfred.utils import data_util, eval_util, model_util
-from alfred.model import train
 from alfred.nn.enc_visual import FeatureExtractor
 
 from teach.inference.actions import obj_interaction_actions
 from teach.inference.teach_model import TeachModel
 from teach.logger import create_logger
+from alfred.data import GuidesEdhDataset, GuidesSpeakerDataset, RLEdhDataset
 
 logger = create_logger(__name__)
+
 
 
 class ETRLModel(torch.nn.Module):
@@ -60,7 +61,41 @@ class ETRLModel(torch.nn.Module):
         self.vocab_obj = torch.load(vocab_obj_file)
 
         self.create_model(args)
+    
+    def load_data_from_disk(self, name, args, ann_type, valid_only=False):
+        """
+        load dataset and wrap them into torch loaders
+        """
+        partitions = ([] if valid_only else ["train"]) + ["valid_seen", "valid_unseen"]
+        datasets = []
+        for partition in partitions:
+            if args.model == "RL":
+                dataset = RLEdhDataset(name, partition, args, ann_type)
+            elif args.model == "speaker":
+                dataset = GuidesSpeakerDataset(name, partition, args, ann_type)
+            elif args.model == "transformer":
+                dataset = GuidesEdhDataset(name, partition, args, ann_type)
+            else:
+                raise ValueError("Unknown model: {}".format(args.model))
+            datasets.append(dataset)
+        return datasets
 
+    def process_vocabs(self, datasets, args):
+        """
+        assign the largest output vocab to all datasets, compute embedding sizes
+        """
+        # find the longest vocabulary for outputs among all datasets
+        for dataset in datasets:
+            logger.debug("dataset.id = %s, vocab_out = %s" % (dataset.id, str(dataset.vocab_out)))
+        vocab_out = sorted(datasets, key=lambda x: len(x.vocab_out))[-1].vocab_out
+        # make all datasets to use this vocabulary for outputs translation
+        for dataset in datasets:
+            dataset.vocab_translate = vocab_out
+        # prepare a dictionary for embeddings initialization: vocab names and their sizes
+        embs_ann = {}
+        for dataset in datasets:
+            embs_ann[dataset.name] = len(dataset.vocab_in)
+        return embs_ann, vocab_out
 
     
     def create_model(self, args):
@@ -76,11 +111,11 @@ class ETRLModel(torch.nn.Module):
         datasets = []
         ann_types = iter(args.data["ann_type"])
         for name, ann_type in zip(args.data["train"], ann_types):
-            datasets.extend(train.load_data(name, args, ann_type))
+            datasets.extend(self.load_data_from_disk(name, args, ann_type))
         for name, ann_type in zip(args.data["valid"], ann_types):
-            datasets.extend(train.load_data(name, args, ann_type, valid_only=True))
+            datasets.extend(self.load_data_from_disk(name, args, ann_type, valid_only=True))
         # assign vocabs to datasets and check their sizes for nn.Embeding inits
-        embs_ann, vocab_out = train.process_vocabs(datasets, args)
+        embs_ann, vocab_out = self.process_vocabs(datasets, args)
 
         # create the model
         ModelClass = import_module("alfred.model.{}".format(args.model)).Model
@@ -99,12 +134,13 @@ class ETRLModel(torch.nn.Module):
         self.object_predictor = eval_util.load_object_predictor(self.args)
         self.vocab = {"word": train_vocab["word"], "action_low": self.model.vocab_out}
         self.preprocessor = Preprocessor(vocab=self.vocab)
+
     
-    def load_data(self, edh_instance):
+    def load_data_to_model(self, edh_instance):
 
         feat = dict()
-        feat["lang"] = GuidesEdhDataset.load_lang(edh_instance)
-        feat["action"] = GuidesEdhDataset.load_action(edh_instance, self.vocab["action_low"])
+        feat["lang"] = RLEdhDataset.load_lang(edh_instance)
+        feat["action"] = RLEdhDataset.load_action(edh_instance, self.vocab["action_low"])
         feat["obj_interaction_action"] = [
             a["obj_interaction_action"] for a in edh_instance["num"]["driver_actions_low"]
         ]
@@ -116,7 +152,7 @@ class ETRLModel(torch.nn.Module):
     def load_object_classes(self, task_json, vocab=None):
         """
         load object classes for interactive actions, helper function for load_data()
-        from GuidesEDHDataset
+        from RLEdhDataset
         """
         object_classes = []
         for idx, action in enumerate(task_json["num"]["driver_actions_low"]):

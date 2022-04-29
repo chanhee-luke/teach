@@ -51,7 +51,7 @@ def cfg_exp():
     ## RL Simulator config
 
     # Default data_dir
-    data_dir = "/tmp/teach-dataset"    
+    data_dir = "/home/ubuntu/data/teach-dataset"    
 
     # Number of processes
     num_processes = 1

@@ -34,6 +34,7 @@ class BaseDataset(TorchDataset):
             logger.info("Visual checkpoint for data preprocessing: %s" % str(self.dataset_info["visual_checkpoint"]))
 
         # load data
+        print(path)
         self._length = self.load_data(path)
         if self.args.fast_epoch:
             self._length = 16

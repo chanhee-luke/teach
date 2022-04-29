@@ -275,20 +275,20 @@ def main(args):
         share_memory=True,
         compress_type=args.compress_type,
     )
-    if len(trajs_list) > 0:
-        manager = torch.multiprocessing.Manager()
-        lock = manager.Lock()
-        trajs_queue = manager.Queue()
-        for path in trajs_list:
-            trajs_queue.put(path)
-        args_process_feats = [trajs_queue, extractor, lock, args.image_folder]
-        run_in_parallel(
-            process_feats,
-            args.num_workers,
-            output_path,
-            args=args_process_feats,
-            use_processes=True,
-        )
+    # if len(trajs_list) > 0:
+    #     manager = torch.multiprocessing.Manager()
+    #     lock = manager.Lock()
+    #     trajs_queue = manager.Queue()
+    #     for path in trajs_list:
+    #         trajs_queue.put(path)
+    #     args_process_feats = [trajs_queue, extractor, lock, args.image_folder]
+    #     run_in_parallel(
+    #         process_feats,
+    #         args.num_workers,
+    #         output_path,
+    #         args=args_process_feats,
+    #         use_processes=True,
+    #     )
 
     # finally, gather all the data
     gather_data(output_path, args.num_workers)

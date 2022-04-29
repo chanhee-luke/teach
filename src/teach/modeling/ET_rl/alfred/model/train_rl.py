@@ -7,7 +7,6 @@ import numpy as np
 import torch
 from alfred import constants
 from alfred.config import exp_ingredient, train_ingredient
-from alfred.data import GuidesEdhDataset, GuidesSpeakerDataset
 from alfred.model.learned import LearnedModel
 from alfred.utils import data_util, helper_util, model_util
 from alfred.model.et_rl_model import ETRLModel
@@ -23,7 +22,7 @@ from argparse import ArgumentParser
 from datetime import datetime
 
 from teach.eval.compute_metrics import aggregate_metrics
-from teach.rl_utils.rl_train_runner import RLTrainRunner, RLTrainRunnerConfig
+from alfred.utils.rl_agent import RLAgent, RLAgentConfig
 from teach.logger import create_logger
 from teach.utils import dynamically_load_class
 
@@ -90,23 +89,6 @@ def load_only_matching_layers(model, pretrained_model, train_lmdb_name):
     return pretrained_dict
 
 
-def load_data(name, args, ann_type, valid_only=False):
-    """
-    load dataset and wrap them into torch loaders
-    """
-    partitions = ([] if valid_only else ["train"]) + ["valid_seen", "valid_unseen"]
-    datasets = []
-    for partition in partitions:
-        if args.model == "speaker":
-            dataset = GuidesSpeakerDataset(name, partition, args, ann_type)
-        elif args.model == "transformer":
-            dataset = GuidesEdhDataset(name, partition, args, ann_type)
-        else:
-            raise ValueError("Unknown model: {}".format(args.model))
-        datasets.append(dataset)
-    return datasets
-
-
 def wrap_datasets(datasets, args):
     """
     wrap datasets with torch loaders
@@ -138,28 +120,10 @@ def wrap_datasets(datasets, args):
     return loaders
 
 
-def process_vocabs(datasets, args):
-    """
-    assign the largest output vocab to all datasets, compute embedding sizes
-    """
-    # find the longest vocabulary for outputs among all datasets
-    for dataset in datasets:
-        logger.debug("dataset.id = %s, vocab_out = %s" % (dataset.id, str(dataset.vocab_out)))
-    vocab_out = sorted(datasets, key=lambda x: len(x.vocab_out))[-1].vocab_out
-    # make all datasets to use this vocabulary for outputs translation
-    for dataset in datasets:
-        dataset.vocab_translate = vocab_out
-    # prepare a dictionary for embeddings initialization: vocab names and their sizes
-    embs_ann = {}
-    for dataset in datasets:
-        embs_ann[dataset.name] = len(dataset.vocab_in)
-    return embs_ann, vocab_out
-
-
 @ex.automain
 def main(train, exp):
     """
-    train a network using an lmdb dataset
+    train a network using the lmdb dataset
     """
     start_time = datetime.now()
 
@@ -168,21 +132,21 @@ def main(train, exp):
     args = prepare(train, exp)
 
     # load dataset(s) and process vocabs
-    datasets = []
-    ann_types = iter(args.data["ann_type"])
-    for name, ann_type in zip(args.data["train"], ann_types):
-        datasets.extend(load_data(name, args, ann_type))
-    for name, ann_type in zip(args.data["valid"], ann_types):
-        datasets.extend(load_data(name, args, ann_type, valid_only=True))
-    # assign vocabs to datasets and check their sizes for nn.Embeding inits
-    embs_ann, vocab_out = process_vocabs(datasets, args)
-    args.embs_ann = embs_ann
-    args.vocab_out = vocab_out
+    # datasets = []
+    # ann_types = iter(args.data["ann_type"])
+    # for name, ann_type in zip(args.data["train"], ann_types):
+    #     datasets.extend(load_data(name, args, ann_type))
+    # for name, ann_type in zip(args.data["valid"], ann_types):
+    #     datasets.extend(load_data(name, args, ann_type, valid_only=True))
+    # # assign vocabs to datasets and check their sizes for nn.Embeding inits
+    # embs_ann, vocab_out = process_vocabs(datasets, args)
+    # args.embs_ann = embs_ann
+    # args.vocab_out = vocab_out
 
-    # Model args for teh simulator
-    model_args = [args.model_module, args.model_class]
+    # # Model args for the simulator
+    # model_args = [args.model_module, args.model_class]
 
-    logger.debug("In train.main, vocab_out = %s" % str(vocab_out))
+    # logger.debug("In train.main, vocab_out = %s" % str(vocab_out))
     # # wrap datasets with loaders
     # loaders = wrap_datasets(datasets, args)
     # # create the model
@@ -207,7 +171,7 @@ def main(train, exp):
             )
             exit(1)
 
-    runner_config = RLTrainRunnerConfig(
+    agent_config = RLAgentConfig(
         data_dir=args.data_dir,
         split=args.split,
         output_dir=args.output_dir,
@@ -222,10 +186,10 @@ def main(train, exp):
         use_img_file=args.use_img_file,
     )
 
-    model = ETRLModel(runner_config.model_args)
+    model = ETRLModel(agent_config.model_args)
 
-    runner = RLTrainRunner(edh_instance_files, runner_config)
-    metrics = runner.run(model)
+    agent = RLAgent(edh_instance_files, agent_config)
+    metrics = agent.run(model)
 
     train_end_time = datetime.now()
     logger.info("Time for RL training: %s" % str(train_end_time - start_time))

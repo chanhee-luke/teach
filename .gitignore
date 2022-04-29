@@ -10,3 +10,4 @@ dist
 src/teach/analysis/.ipynb_checkpoints/
 pip-wheel-metadata/
 *.pyc
+exp/

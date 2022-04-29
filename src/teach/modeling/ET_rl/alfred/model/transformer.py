@@ -206,15 +206,17 @@ class Model(base.Model):
                     .nonzero(as_tuple=False)
                     .view(-1)
                 )
-            #print(gt_dict["driver_actions_pred_mask"])
-            #print(gt_dict["obj_interaction_action"])
-            # if interact_idxs.nelement() > 0:
-            #     #print(object_pred.size())
-            #     #print(object_gt.size())
-            #     object_pred = object_pred.view(object_pred.shape[0] * object_pred.shape[1], *object_pred.shape[2:])
-            #     #print(object_pred.size())
-            #     object_loss = model_util.obj_classes_loss(object_pred, object_gt, interact_idxs)
-            #     losses["object"] = object_loss * self.args.object_loss_wt
+            print(gt_dict["driver_actions_pred_mask"])
+            print(gt_dict["obj_interaction_action"])
+            print(object_pred)
+            if interact_idxs.nelement() > 0:
+                print(object_pred.size())
+                print(object_gt.size())
+                object_pred = object_pred.view(object_pred.shape[0] * object_pred.shape[1], *object_pred.shape[2:])
+                print(object_pred.size())
+                object_loss = model_util.obj_classes_loss(object_pred, object_gt, interact_idxs)
+                exit()
+                losses["object"] = object_loss * self.args.object_loss_wt
 
         # subgoal completion loss
         if self.args.subgoal_aux_loss_wt > 0:
@@ -263,3 +265,17 @@ class Model(base.Model):
         model_util.compute_obj_class_precision(
             metrics_dict, gt_dict, model_out["object"], compute_train_loss_over_history
         )
+
+
+class Critic(nn.Module):
+    def __init__(self):
+        super(Critic, self).__init__()
+        self.state2value = nn.Sequential(
+            nn.Linear(768, 512),
+            nn.ReLU(),
+            nn.Dropout(args.dropout),
+            nn.Linear(512, 1),
+        )
+
+    def forward(self, state):
+        return self.state2value(state).squeeze()

@@ -1,6 +1,7 @@
-export ET_DATA=/tmp/teach-dataset
+export ET_DATA=/home/ubuntu/data/teach-dataset
 export TEACH_ROOT_DIR=/home/ubuntu/simbot/teach
 export ET_LOGS=/home/ubuntu/simbot/teach/exp
 export TEACH_SRC_DIR=$TEACH_ROOT_DIR/src
-export ET_ROOT=$TEACH_SRC_DIR/teach/modeling/ET
+export ET_ROOT=$TEACH_SRC_DIR/teach/modeling/ET_rl
 export INFERENCE_OUTPUT_PATH=/home/ubuntu/simbot/teach/exp
+export PYTHONPATH=$TEACH_SRC_DIR:$ET_ROOT:$PYTHONPATH
